@@ -1,0 +1,190 @@
+id: hhan
+name: 憨憨
+domain: https://hhanclub.top/
+encoding: UTF-8
+config_url: https://mirror.ghproxy.com/https://raw.githubusercontent.com/htnanako/movie-robot-public/main/app/sites/hhan.yml
+
+login:
+  test:
+    selector: img[src="styles/HHan/icons/icon-logout.svg"]
+
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies,cate_level2_ desc: "Movie" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "TV Series" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "TV Show" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "Documentary" }
+  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "Anime" }
+  - { id: 406, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "MV" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "Sports" }
+  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "HQ Audio" }
+  - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "Misc" }
+
+userinfo:
+  path: https://hhanclub.top/index.php
+  item:
+    selector: div[id="user-info-panel"]
+  fields:
+    uid:
+      default_value: 0
+      selector: a[href^="https://hhanclub.top/userdetails.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: a[href^="https://hhanclub.top/userdetails.php?id="]
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: a[href^="https://hhanclub.top/userdetails.php?id="] > b
+    share_ratio:
+      default_value: ''
+      selector: img[alt="分享率"]
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    uploaded:
+      default_value: 0
+      selector: img[alt="上传"]
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    downloaded:
+      default_value: 0
+      selector: img[alt="下载"]
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    seeding:
+      default_value: 0
+      selector: img[alt="做种数"]
+      method: next_sibling
+    leeching:
+      default_value: 0
+      selector: img[alt="下载数"]
+      method: next_sibling
+    vip_group:
+      case:
+        a[class^="VIP"]: true
+        "*": false
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat[]={{c}}&{% endfor %}"
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    # 0 incldead, 1 active, 2 dead
+    incldead: 1
+    # 0 all, 1 normal, 2 free, 3 2x, 4 2xfree, 5 50%, 6 2x50%, 7 30%
+    spstate: "{% if query.free %}2{% else %}0{% endif %}"
+    # 0 title, 1 descr, 3 uploader, 4 imdburl (searching imdburl does not work with tt1234567, but descr is good)
+    search_area: "{% if query.imdb_id %}4{% else %}0{%endif%}"
+    # 0 AND, 1 OR, 2 exact
+    search-mode: 0
+    sort: "{{ query.sort }}"
+    type: "{{ query.type }}"
+    page: "{{ query.page }}"
+
+torrents:
+  list:
+    selector: div[id="mainContent"] > div > div.z-10.m-auto.m-auto.\!rounded-md > div.flex.flex-col.m-auto > div.torrent-table-sub-info
+  fields:
+    id:
+      selector: a[href^="details.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title_default:
+      selector: div.flex.torrent-title.items-center.justify-between > div > a[href^="details.php?id="]
+    title_optional:
+      optional: true
+      selector: a[title][href^="details.php?id="]
+      attribute: title
+    title:
+      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    category:
+      selector: a[href^="?cat\[\]="]
+      attribute: href
+      filters:
+        - name: replace
+          args: [ "?", "" ]
+        - name: re_search
+          args: [ '\d+', 0 ]
+    details:
+      selector: a[href^="details.php?id="]
+      attribute: href
+    download:
+      selector: a[href^="download.php?id="]
+      attribute: href
+    imdbid:
+      selector: div.imdb_100 > a
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ 'tt\d+',0 ]
+    date_elapsed:
+      # 站点设置，已去时间 (默认)
+      selector: div.items-center > div.torrent-info > div:nth-child(2) > span[title]
+      attribute: title
+      optional: true
+    date_added:
+      # 站点设置，实际时间
+      selector: div.items-center > div.torrent-info > div:nth-child(2):not(:has(span))
+      optional: true
+    date:
+      text: "{% if fields['date_elapsed'] or fields['date_added'] %}{{ fields['date_elapsed'] if fields['date_elapsed'] else fields['date_added'] }}{% else %}now{% endif %}"
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    size:
+      selector: div.items-center > div.torrent-info > div:nth-child(1)
+    seeders:
+      selector: div.items-center > div.torrent-info > div:nth-child(3) > a
+    leechers:
+      selector: div.items-center > div.torrent-info > div:nth-child(4) > a
+    grabs:
+      selector: div.items-center > div.torrent-info > div:nth-child(5)
+    downloadvolumefactor:
+      case:
+        span.promotion-tag-free: 0
+        span.promotion-tag-2xfree: 0
+        span.promotion-tag-50: 0.5
+        span.promotion-tag-2x50: 0.5
+        span.promotion-tag-30: 0.3
+        "*": 1
+    uploadvolumefactor:
+      case:
+        span.promotion-tag-2x50: 2
+        span.promotion-tag-2xfree: 2
+        span.promotion-tag-2x: 2
+        "*": 1
+    free_deadline:
+      default_value: "{% if fields['downloadvolumefactor']==0 %}{{max_time}}{% endif%}"
+      default_value_format: '%Y-%m-%d %H:%M:%S.%f'
+      selector: div.flex-col.flex > div.items-center > div.flex > span > span
+      attribute: title
+      filters:
+        - name: re_search
+          args: [ '\d+-\d+-\d+ \d+:\d+:\d+', 0 ]
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    tags:
+      selectors: div.items-center > a[href^="?tag_id"]
+    subject:
+      selector: div.torrent-title > div > div.items-center > div.text-ellipsis
+    description:
+      text: "{% if fields['tags']%}{{ fields['subject']+' '+fields['tags']|join(' ') }}{% else %}{{ fields['subject'] }}{% endif %}"
+    minimumratio:
+      case:
+        span.hitandrun: 1
+        "*": 0
+    minimumseedtime:
+      case:
+        span.hitandrun: 259200
+        "*": 0
