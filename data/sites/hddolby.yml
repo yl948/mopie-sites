@@ -117,7 +117,7 @@ torrents:
         - name: replace
           args: [ "?", "" ]
         - name: querystring
-          args: cat
+          args: ["cat"]
     details:
       selector: a[href^="details.php?id="]
       attribute: href

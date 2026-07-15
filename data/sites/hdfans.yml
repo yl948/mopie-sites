@@ -111,7 +111,7 @@ torrents:
       attribute: href
       filters:
         - name: querystring
-          args: cat
+          args: ["cat"]
     title_default:
       selector: a[href^="details.php?id="]
     title_optional:
@@ -120,6 +120,9 @@ torrents:
       attribute: title
     title:
       text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    subject:
+      selector: td.embedded:has(a[href*='details.php'])
+      contents: -1
     details:
       selector: a[href^="details.php?id="]
       attribute: href
@@ -162,6 +165,8 @@ torrents:
         img.pro_free2up: 2
         img.pro_2up: 2
         "*": 1
+    tags:
+      selector: td.embedded span[style*="background-color"][style*="border-radius"]
     free_deadline:
       default_value: "{% if fields['downloadvolumefactor']==0 %}{{max_time}}{% endif%}"
       default_value_format: '%Y-%m-%d %H:%M:%S.%f'

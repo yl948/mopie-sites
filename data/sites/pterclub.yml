@@ -110,7 +110,7 @@ torrents:
       attribute: href
       filters:
         - name: querystring
-          args: cat
+          args: ["cat"]
     title_default:
       selector: a[href^="details"]
     title_optional:

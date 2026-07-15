@@ -146,7 +146,7 @@ torrents:
       attribute: href
       filters:
         - name: querystring
-          args: cat
+          args: ["cat"]
     details:
       selector: a[href^="details.php?id="]
       attribute: href
