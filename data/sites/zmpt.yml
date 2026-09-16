@@ -1,27 +1,28 @@
-id: qingwa
-name: 青蛙
-domain: https://qingwapt.com/
+id: zmpt
+name: 织梦
+domain: https://zmpt.cc/
 encoding: UTF-8
-config_url: https://raw.githubusercontent.com/yl948/mopie-sites/main/data/sites/qingwa.yml
 
 login:
   test:
     selector: a[href="logout.php"]
 
+# 分类 ID 来自 2026-09 实测 (torrents.php 分类导航 + 种子行 img[class^=c_] 的 alt)
 category_mappings:
   - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
-  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "电视剧" }
   - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
-  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
-  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
-  - { id: 406, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "MV" }
-  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
-  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
-  - { id: 412, cate_level1: TV, cate_level2: TV, cate_level2_desc: "短剧" }
   - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他" }
+  - { id: 417, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
+  - { id: 422, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 423, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 424, cate_level1: Other, cate_level2: Audio, cate_level2_desc: "有声书" }
+  - { id: 425, cate_level1: Other, cate_level2: Other, cate_level2_desc: "软件" }
+  - { id: 426, cate_level1: Other, cate_level2: Other, cate_level2_desc: "游戏" }
+  - { id: 427, cate_level1: TV, cate_level2: TV, cate_level2_desc: "短剧" }
 
 userinfo:
-  path: https://qingwapt.com/index.php
+  path: https://zmpt.cc/index.php
   item:
     selector: table[id="info_block"]
   fields:
@@ -84,26 +85,27 @@ search:
     type: "{{ query.type }}"
     page: "{{ query.page }}"
 
+# 列结构实测: 1类型 2标题 3评论 4时间(span[title]=绝对时间) 5大小 6种子 7下载 8完成 9发布者
 torrents:
   list:
-    selector: table.torrents > tr:has(td.rowfollow)
+    selector: table.torrents tr:has(td.rowfollow)
   fields:
     id:
-      selector: td.embedded a[href^="download.php?id="]
+      selector: table.torrentname a[href^="download.php?id="]
       attribute: href
       filters:
         - name: re_search
           args: [ '\d+', 0 ]
     title_default:
-      selector: td.embedded a[href^="details.php?id="]
+      selector: table.torrentname a[href^="details.php?id="]
     title_optional:
       optional: true
-      selector: td.embedded a[title][href^="details.php?id="]
+      selector: table.torrentname a[title][href^="details.php?id="]
       attribute: title
     title:
       text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
     subject:
-      selector: td.embedded:has(a[href*='details.php'])
+      selector: table.torrentname td.embedded:has(a[href*='details.php'])
       contents: -1
     category:
       selector: td:first-child a[href^="?cat="]
@@ -114,20 +116,22 @@ torrents:
         - name: querystring
           args: ["cat"]
     details:
-      selector: td.embedded a[href^="details.php?id="]
+      selector: table.torrentname a[href^="details.php?id="]
       attribute: href
     download:
-      selector: td.embedded a[href^="download.php?id="]
+      selector: table.torrentname a[href^="download.php?id="]
       attribute: href
     imdbid:
-      selector: td.embedded img[alt="imdb"] + span
+      selector: table.torrentname img[alt="imdb"] + span
       optional: true
     size:
       selector: td.rowfollow:nth-child(5)
     date_added:
       selector: td.rowfollow:nth-child(4) > span[title]
       attribute: title
-      optional: true
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
     seeders:
       selector: td.rowfollow a[href*="dllist=1#seeders"]
     leechers:
@@ -135,10 +139,10 @@ torrents:
     snatched:
       selector: td.rowfollow a[href^="viewsnatches.php?id="]
     downloadvolumefactor:
+      selector: td
       case:
         ".free_bg": 0
         ".twoupfree_bg": 0
-        span[alt='Free']: 0
         img.pro_free: 0
         img.pro_free2up: 0
         ".halfdown_bg": 0.5
@@ -149,6 +153,7 @@ torrents:
         ".d70down_bg": 0.7
         "*": 1
     uploadvolumefactor:
+      selector: td
       case:
         ".twoupfree_bg": 2
         ".twoup_bg": 2
@@ -157,10 +162,10 @@ torrents:
         img.pro_2up: 2
         "*": 1
     tags:
-      selector: td.embedded span[style*="background-image"]
+      selector: table.torrentname span[style*="background-color"]
     free_deadline:
-      selector: "span[alt='Free'],img.pro_free,img.pro_free2up"
+      selector: img.pro_free,img.pro_free2up
       attribute: onmouseover
       filters:
         - name: re_search
-          args: ['title=["\\]+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', 1]
+          args: [ 'title="(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"', 1 ]

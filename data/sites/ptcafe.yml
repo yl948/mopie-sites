@@ -1,64 +1,67 @@
-id: ptsbao
-name: 烧包乐园
-domain: https://ptsbao.club/
+# PTCafe 咖啡PT — NexusPHP
+# 适配: 基于真实抓取 (cat 401-409), 列偏移 size=5/seeders=6/leechers=7
+id: ptcafe
+name: 咖啡PT
+domain: https://ptcafe.club/
 encoding: UTF-8
-config_url: https://raw.githubusercontent.com/yl948/mopie-sites/main/data/sites/ptsbao.yml
-
-login:
-  test:
-    selector: a[href="logout.php"]
+config_url: https://raw.githubusercontent.com/yl948/mopie-sites/main/data/sites/ptcafe.yml
 
 category_mappings:
   - { id: 401, cate_level1: Movie, cate_level2: "电影", cate_level2_desc: "电影" }
   - { id: 402, cate_level1: TV, cate_level2: "剧集", cate_level2_desc: "剧集" }
   - { id: 403, cate_level1: TV, cate_level2: "综艺", cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: "纪录", cate_level2_desc: "纪录" }
   - { id: 405, cate_level1: Anime, cate_level2: "动漫", cate_level2_desc: "动漫" }
-  - { id: 414, cate_level1: Music, cate_level2: "音乐", cate_level2_desc: "音乐" }
-  - { id: 404, cate_level1: Documentary, cate_level2: "纪录片", cate_level2_desc: "纪录片" }
-  - { id: 423, cate_level1: Other, cate_level2: "原创", cate_level2_desc: "原创" }
+  - { id: 406, cate_level1: Other, cate_level2: "演唱", cate_level2_desc: "演唱" }
+  - { id: 407, cate_level1: TV, cate_level2: "体育", cate_level2_desc: "体育" }
+  - { id: 408, cate_level1: Other, cate_level2: "音乐", cate_level2_desc: "音乐" }
   - { id: 409, cate_level1: Other, cate_level2: "其他", cate_level2_desc: "其他" }
-  - { id: 424, cate_level1: Other, cate_level2: "限制", cate_level2_desc: "限制" }
+
+login:
+  test:
+    selector: a[href="logout.php"]
 
 userinfo:
-  path: https://ptsbao.club/rules.php
+  path: https://ptcafe.club/index.php
   item:
     selector: table[id="info_block"]
   fields:
     uid:
       default_value: 0
-      selector: a[href^="userdetails.php?id="]
+      selector: a[href*="userdetails.php?id="]
       attribute: href
       filters:
         - name: re_search
-          args: [ '\d+', 0 ]
+          args: [ d+, 0 ]
     user_group:
-      default_value: ''
-      selector: a[href^="userdetails.php?id="]
+      default_value: ""
+      selector: a[href*="userdetails.php?id="]
       attribute: class
     username:
-      default_value: '未知用户名'
-      selector: a[href^="userdetails.php?id="] > b
+      default_value: "未知用户名"
+      selector: a[href*="userdetails.php?id="] b
     share_ratio:
-      default_value: ''
-      selector: font[class="color_ratio"]
+      default_value: ""
+      selector: "font.color_ratio"
       method: next_sibling
       filters:
         - name: replace
-          args: [ '无限','inf' ]
+          args: [ 无限,inf ]
     uploaded:
       default_value: 0
-      selector: font.color_uploaded
+      selector: "font.color_uploaded"
       method: next_sibling
       filters:
         - name: replace
-          args: [ '无限','inf' ]
+          args: [ 无限,inf ]
     downloaded:
       default_value: 0
-      selector: font.color_downloaded
+      selector: "font.color_downloaded"
       method: next_sibling
       filters:
         - name: replace
-          args: [ '无限','inf' ]
+          args: [ 无限,inf ]
+    # ptcafe 用 font[title] 精确取做种数（避免 next_sibling 空文本 Index 误抓）
     seeding:
       default_value: 0
       selector: img[alt="Torrents seeding"]
@@ -67,10 +70,7 @@ userinfo:
       default_value: 0
       selector: img[alt="Torrents leeching"]
       method: next_sibling
-    vip_group:
-      case:
-        a[class^="VIP"]: true
-        "*": false
+
 search:
   paths:
     - path: torrents.php
@@ -78,13 +78,9 @@ search:
   query:
     $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
     search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
-    # 0 incldead, 1 active, 2 dead
     incldead: 1
-    # 0 all, 1 normal, 2 free, 3 2x, 4 2xfree, 5 50%, 6 2x50%, 7 30%
     spstate: "{% if query.free %}2{% else %}0{% endif %}"
-    # 0 title, 1 descr, 3 uploader, 4 imdburl (searching imdburl does not work with tt1234567, but descr is good)
     search_area: "{% if query.imdb_id %}4{% else %}0{%endif%}"
-    # 0 AND, 1 OR, 2 exact
     search_mode: 0
     sort: "{{ query.sort }}"
     type: "{{ query.type }}"
@@ -92,16 +88,16 @@ search:
 
 torrents:
   list:
-    selector: table.torrents > tbody > tr:has(table)
+    selector: table.torrents > tr:has(table)
   fields:
     id:
       selector: a[href^="details.php?id="]
       attribute: href
       filters:
         - name: re_search
-          args: [ '\d+', 0 ]
+          args: [ d+, 0 ]
     category:
-      selector: a[href^="torrents.php?cat="]
+      selector: a[href^="?cat="]
       attribute: href
       filters:
         - name: querystring
@@ -113,32 +109,31 @@ torrents:
       selector: a[title][href^="details.php?id="]
       attribute: title
     title:
-      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+      text: "{% if fields[title_optional] %}{{ fields[title_optional] }}{% else %}{{ fields[title_default] }}{% endif %}"
     details:
       selector: a[href^="details.php?id="]
       attribute: href
     download:
       selector: a[href^="download.php?id="]
       attribute: href
+    # ptcafe 有分类图标列(+1) -> size=5, seeders=6, leechers=7
     size:
-      selector: td:nth-child(6)
+      selector: td:nth-child(5)
     grabs:
-      selector: td:nth-child(9)
-    seeders:
-      selector: td:nth-child(7)
-    leechers:
       selector: td:nth-child(8)
+    seeders:
+      selector: td:nth-child(6)
+    leechers:
+      selector: td:nth-child(7)
     date_elapsed:
-      # time type: time elapsed (default)
-      selector: td:nth-child(5) > span[title]
+      selector: td:nth-child(4) > span[title]
       attribute: title
       optional: true
     date_added:
-      # time added
-      selector: td:nth-child(5):not(:has(span))
+      selector: td:nth-child(4):not(:has(span))
       optional: true
     date:
-      text: "{% if fields['date_elapsed'] or fields['date_added'] %}{{ fields['date_elapsed'] if fields['date_elapsed'] else fields['date_added'] }}{% else %}now{% endif %}"
+      text: "{% if fields[date_elapsed] or fields[date_added] %}{{ fields[date_elapsed] if fields[date_elapsed] else fields[date_added] }}{% else %}now{% endif %}"
       filters:
         - name: dateparse
           args: "%Y-%m-%d %H:%M:%S"
@@ -157,13 +152,17 @@ torrents:
         img.pro_2up: 2
         "*": 1
     free_deadline:
-      default_value: "{% if fields['downloadvolumefactor']==0 %}{{max_time}}{% endif%}"
-      default_value_format: '%Y-%m-%d %H:%M:%S.%f'
-      selector: td:nth-child(2) > table > tr > td:nth-child(1) > font > b > span[title]
+      default_value: "{% if fields[downloadvolumefactor]==0 %}{{max_time}}{% endif%}"
+      default_value_format: "%Y-%m-%d %H:%M:%S.%f"
+      selector: span[title]
       attribute: title
       filters:
         - name: dateparse
           args: "%Y-%m-%d %H:%M:%S"
+    tags:
+      selectors: table.torrentname > tr > td:nth-child(2) > div.torrent_title_desc > span
+    subject:
+      selector: table.torrentname > tr > td:nth-child(2) > div.torrent_title_desc
+      remove: div,span
     description:
-      selector: table.torrentname > td
-      contents: -1
+      text: "{% if fields[tags]%}{{ fields[subject]+ +fields[tags]|join( ) }}{% else %}{{ fields[subject] }}{% endif %}"
