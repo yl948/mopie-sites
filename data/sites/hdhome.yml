@@ -135,7 +135,7 @@ search:
 
 torrents:
   list:
-    selector: table.torrents > tr:has(table)
+    selector: table.torrents > tbody > tr:has(table.torrentname)
   fields:
     id:
       selector: a[href^="details.php?id="]
@@ -188,11 +188,11 @@ torrents:
     size:
       selector: td:nth-child(5)
     seeders:
-      selector: td:nth-child(6)
+      selector: 'a[href*="#seeders"]'
     leechers:
-      selector: td:nth-child(7)
+      selector: 'a[href*="#leechers"]'
     grabs:
-      selector: td:nth-child(8)
+      selector: 'a[href*="viewsnatches"], a[href*="snatched"]'
     downloadvolumefactor:
       case:
         img.pro_free: 0
@@ -210,17 +210,17 @@ torrents:
     free_deadline:
       default_value: "{% if fields['downloadvolumefactor']==0 %}{{max_time}}{% endif%}"
       default_value_format: '%Y-%m-%d %H:%M:%S.%f'
-      selector: img.pro_free,img.pro_free2up
-      attribute: onmouseover
+      selector: 'span[title^="20"]'
+      attribute: title
       filters:
         - name: re_search
           args: [ '\d+-\d+-\d+ \d+:\d+:\d+', 0 ]
         - name: dateparse
           args: "%Y-%m-%d %H:%M:%S"
     subject:
-      selector: td:nth-child(2) > table > tr > td.embedded
-      contents: -1
+      selector: "table.torrentname td.embedded:has(a[href*='details.php']) span[style*='float']"
     tags:
-      selectors: td.embedded > span.tags
+      selector: table.torrentname span.tags
+      join: true
     description:
       text: "{% if fields['tags']%}{{ fields['subject']+' '+fields['tags']|join(' ') }}{% else %}{{ fields['subject'] }}{% endif %}"

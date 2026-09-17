@@ -88,7 +88,7 @@ search:
 
 torrents:
   list:
-    selector: table.torrents > tr:has(table)
+    selector: table.torrents > tbody > tr:has(table.torrentname)
   fields:
     id:
       selector: a[href^="details.php?id="]
@@ -122,9 +122,9 @@ torrents:
     grabs:
       selector: td:nth-child(8)
     seeders:
-      selector: td:nth-child(6)
+      selector: 'a[href*="#seeders"]'
     leechers:
-      selector: td:nth-child(7)
+      selector: 'a[href*="#leechers"]'
     date_elapsed:
       selector: td:nth-child(4) > span[title]
       attribute: title
@@ -154,15 +154,16 @@ torrents:
     free_deadline:
       default_value: "{% if fields[downloadvolumefactor]==0 %}{{max_time}}{% endif%}"
       default_value_format: "%Y-%m-%d %H:%M:%S.%f"
-      selector: span[title]
+      selector: span[title^="20"]
       attribute: title
       filters:
         - name: dateparse
           args: "%Y-%m-%d %H:%M:%S"
     tags:
-      selectors: table.torrentname > tr > td:nth-child(2) > div.torrent_title_desc > span
+      selector: 'table.torrentname td.embedded span[style*="background-color"]'
+      join: true
     subject:
-      selector: table.torrentname > tr > td:nth-child(2) > div.torrent_title_desc
-      remove: div,span
+      selector: "table.torrentname td.embedded:has(a[href*='details.php'])"
+      contents: -1
     description:
       text: "{% if fields[tags]%}{{ fields[subject]+ +fields[tags]|join( ) }}{% else %}{{ fields[subject] }}{% endif %}"

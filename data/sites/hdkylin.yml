@@ -115,11 +115,14 @@ torrents:
       attribute: title
       optional: true
     seeders:
-      selector: td.rowfollow:nth-child(6) a
+      selector: 'a[href*="#seeders"]'
     leechers:
-      selector: td.rowfollow:nth-child(7)
+      selector: 'a[href*="#leechers"]'
     completed:
-      selector: td.rowfollow:nth-child(8) a
+      selector: 'a[href*="viewsnatches"], a[href*="snatched"]'
+    free_deadline:
+      selector: 'span[title^="20"]'
+      attribute: title
     subject:
       selector: td.embedded:has(a[href*="details.php"])
       contents: -1
