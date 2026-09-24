@@ -1,0 +1,163 @@
+# CarPT carpt.net — NexusPHP
+# 适配: 2026-09 实测。列: 1类型 2标题 3评论 4时间 5大小 6种子 7下载 8完成 9发布者
+# torrentname 三列：标题 | IMDb/豆瓣 | 下载。无海报列，titleEmbedded 第一格就是标题。
+# 免费/50%/2X 都有 onmouseover 剩余时间，标题格里还有可见 span[title=20xx]。
+# 发布时间也是 span[title=20xx]，折扣截止仍用 img.pro_* onmouseover，避免和发种时间抢。
+id: carpt
+name: CarPT
+domain: https://carpt.net/
+encoding: UTF-8
+
+login:
+  test:
+    selector: a[href="logout.php"]
+
+# 分类来自 torrents.php 导航 + 种子行 img alt（2026-09 实测）
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "连续剧" }
+  - { id: 403, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 405, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 406, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 407, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他" }
+
+userinfo:
+  path: https://carpt.net/index.php
+  item:
+    selector: table[id="info_block"]
+  fields:
+    uid:
+      default_value: 0
+      selector: a[href*="userdetails.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: a[href*="userdetails.php?id="]
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: a[href*="userdetails.php?id="] b
+    share_ratio:
+      default_value: ''
+      selector: "font.color_ratio"
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    uploaded:
+      default_value: 0
+      selector: "font.color_uploaded"
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    downloaded:
+      default_value: 0
+      selector: "font.color_downloaded"
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    seeding:
+      default_value: 0
+      selector: img[alt="Torrents seeding"]
+      method: next_sibling
+    leeching:
+      default_value: 0
+      selector: img[alt="Torrents leeching"]
+      method: next_sibling
+
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    incldead: 1
+    spstate: "{% if query.free %}2{% else %}0{% endif %}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{%endif%}"
+    search_mode: 0
+    sort: "{{ query.sort }}"
+    type: "{{ query.type }}"
+    page: "{{ query.page }}"
+
+# 列结构实测: 1类型 2标题 3评论 4时间(span[title]=绝对时间) 5大小 6种子 7下载 8完成 9发布者
+# page=0 首页（置顶+最新），page=1 下一页（置顶仍出现，fetcher 按 detail_url 去重）
+torrents:
+  list:
+    selector: table.torrents > tbody > tr:has(table.torrentname)
+  fields:
+    id:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title_default:
+      selector: table.torrentname a[href^="details.php?id="]
+    title_optional:
+      optional: true
+      selector: table.torrentname a[title][href^="details.php?id="]
+      attribute: title
+    title:
+      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    subject:
+      selector: table.torrentname td.embedded:has(a[href*='details.php'])
+      contents: -1
+    category:
+      selector: td:first-child a[href^="?cat="]
+      attribute: href
+      filters:
+        - name: replace
+          args: ["?", ""]
+        - name: querystring
+          args: ["cat"]
+    details:
+      selector: table.torrentname a[href^="details.php?id="]
+      attribute: href
+    download:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+    size:
+      selector: td.rowfollow:nth-child(5)
+    date_added:
+      selector: td.rowfollow:nth-child(4) > span[title]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    seeders:
+      selector: 'a[href*="#seeders"]'
+    leechers:
+      selector: 'a[href*="#leechers"]'
+    snatched:
+      selector: 'a[href*="snatched"], a[href*="viewsnatches"]'
+    downloadvolumefactor:
+      selector: td
+      case:
+        img.pro_free: 0
+        img.pro_free2up: 0
+        img.pro_50pctdown: 0.5
+        img.pro_50pctdown2up: 0.5
+        img.pro_30pctdown: 0.3
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        img.pro_free2up: 2
+        img.pro_50pctdown2up: 2
+        img.pro_2up: 2
+        "*": 1
+    tags:
+      selector: table.torrentname span[style*="background-color"]
+    free_deadline:
+      selector: img.pro_free,img.pro_free2up,img.pro_50pctdown,img.pro_50pctdown2up,img.pro_2up
+      attribute: onmouseover
+      filters:
+        - name: re_search
+          args: [ 'title="(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"', 1 ]

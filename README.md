@@ -1,17 +1,22 @@
 # Mopie PT Sites Configuration
 
-这是 Mopie 媒体管理工具的 PT 站点配置仓库。只收录已经对照站点页面适配过的配置，未适配的站点不会放进来。
+这是 Mopie 媒体管理工具的 PT 站点配置仓库。只收录已经对照站点页面适配过的配置，未适配的站点不会放进来。配置里没有 Cookie、密码或 API 密钥。
 
 ## 已适配站点
 
 | 站点 | ID | 类型 | 配置文件 |
 |------|-----|------|----------|
-| 青蛙 | qingwa | NexusPHP | qingwa.yml |
-| 红豆饭 | hdfans | NexusPHP | hdfans.yml |
-| 麒麟 | hdkylin | NexusPHP | hdkylin.yml |
-| 家园 | HDHome | NexusPHP | hdhome.yml |
-| 咖啡PT | ptcafe | NexusPHP | ptcafe.yml |
-| 织梦 | zmpt | NexusPHP | zmpt.yml |
+| 末日 |  | "{{ query.type }}" | .yml |
+| 观众 |  | "{{ query.type }}" | .yml |
+| CarPT |  | "{{ query.type }}" | .yml |
+| 红豆饭 |  | "{{ query.type }}" | .yml |
+| 家园 |  | "{{ query.type }}" | .yml |
+| 麒麟 |  | "{{ query.type }}" | .yml |
+| 库非 |  | "{{ query.type }}" | .yml |
+| 馒头 | mteam | API | mteam.yml |
+| 咖啡PT |  | "{{ query.type }}" | .yml |
+| 青蛙 |  | "{{ query.type }}" | .yml |
+| 织梦 |  | "{{ query.type }}" | .yml |
 
 Mopie 更新配置时只会同步本机已经添加的站点，不会把仓库里其它文件整包拉下来。
 

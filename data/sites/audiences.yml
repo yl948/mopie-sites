@@ -1,0 +1,172 @@
+# Audiences 观众 audiences.me — 深度定制版 NexusPHP
+# 适配: 2026-09 实测。与标准 NexusPHP 差异较大，勿套用标准模板。
+#   1) 无 tbody，列表选择器不能带 > tbody >；外层行 10 列
+#   2) 促销用 <font class="free|halfdown|...>，不是 img.pro_free
+#   3) 用户信息在 data-uploader-* 属性里（JSON），没有 font.color_ratio / img[alt="Torrents seeding"]
+#   4) 站点不显示分享率（ratio-free），只有 上传量/下载量/爆米花/做种积分/活跃/排名
+#   5) 页面 1MB+，必须靠 gzip 才能进 30s 超时（Go 默认自动 gzip）
+id: audiences
+name: 观众
+domain: https://audiences.me/
+encoding: UTF-8
+
+# 注：Mopie 的 verifier 实际只看 login.required，且 [id=info_block] 存在即通过（本站无真实 logout 链接）
+login:
+  test:
+    selector: 'div.site-userbar'
+
+# 分类来自 torrents.php 导航（2026-09 实测）
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Other, cate_level2: Audio, cate_level2_desc: "有声书" }
+  - { id: 405, cate_level1: Other, cate_level2: Other, cate_level2_desc: "电子书" }
+  - { id: 406, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他" }
+  - { id: 410, cate_level1: Other, cate_level2: Other, cate_level2_desc: "游戏" }
+  - { id: 412, cate_level1: Other, cate_level2: Other, cate_level2_desc: "教学" }
+
+# 用户信息全部在 site-userbar 的 data-uploader-* 属性中
+userinfo:
+  path: https://audiences.me/index.php
+  item:
+    selector: 'table#info_block'
+  fields:
+    uid:
+      default_value: 0
+      selector: '[data-uploader-url]'
+      attribute: data-uploader-url
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: '[data-uploader-accent]'
+      attribute: data-uploader-accent
+    username:
+      default_value: '未知用户名'
+      selector: '[data-uploader-label]'
+      attribute: data-uploader-label
+    # 分享率/上传/下载/做种在用户栏的 compact-metric 元素里（干净的类名），
+    # 不在 data-uploader-stats 里（那个 JSON 只有 上传量/爆米花/下载量/做种积分/活跃/排名）
+    share_ratio:
+      default_value: ''
+      selector: '.site-userbar__compact-metric--ratio'
+    uploaded:
+      default_value: 0
+      selector: '.site-userbar__compact-metric--uploaded'
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    downloaded:
+      default_value: 0
+      selector: '.site-userbar__compact-metric--downloaded'
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    seeding:
+      default_value: 0
+      selector: '.site-userbar__compact-metric-inline-link--seeding'
+      filters:
+        - name: re_search
+          args: [ '(\d+)', 0 ]
+    leeching:
+      default_value: 0
+      selector: '.site-userbar__compact-metric-inline-link--leeching'
+      filters:
+        - name: re_search
+          args: [ '(\d+)', 0 ]
+
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    incldead: 1
+    spstate: "{% if query.free %}2{% else %}0{% endif %}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{%endif%}"
+    search_mode: 0
+    sort: "{{ query.sort }}"
+    type: "{{ query.type }}"
+    page: "{{ query.page }}"
+
+# 列实测: 1类型 2标题 3评论 4时间 5大小 6种子 7下载 8完成 9进度 10发布者
+# 列表页 page=0/1 顺序推进（仅 1 条重叠，fetcher 按 detail_url 去重），无 skip_page1 陷阱
+torrents:
+  list:
+    selector: table.torrents tr:has(table.torrentname)
+  fields:
+    id:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title_default:
+      selector: table.torrentname a[href^="details.php?id="]
+    title_optional:
+      optional: true
+      selector: table.torrentname a[title][href^="details.php?id="]
+      attribute: title
+    title:
+      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    # 副标题：本站用 span.torrent-subtitle-line 包住（标签+正文），
+    # 正文单独在 span.torrent-subtitle-text。YAML 的 subject 会被 Go 的
+    # extractNexusSubject 覆盖（br 后是元素而非纯文本，回退到 contents -1），
+    # 结果会带标签前缀，属已知行为；tags 字段故意不写，交给 extractNexusTags 取短文本。
+    subject:
+      selector: 'span.torrent-subtitle-text'
+    category:
+      selector: 'td.torrent-type-cell a[href*="cat="]'
+      attribute: href
+      filters:
+        - name: querystring
+          args: ["cat"]
+    details:
+      selector: table.torrentname a[href^="details.php?id="]
+      attribute: href
+    download:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+    size:
+      selector: td.torrent-size-cell
+    date_added:
+      selector: td.torrent-time-cell span[title]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    seeders:
+      selector: 'a[href*="#seeders"]'
+    leechers:
+      selector: 'a[href*="#leechers"]'
+    snatched:
+      selector: 'a[href*="viewsnatches"]'
+    # 促销是 font 元素：free / halfdown；2x 类（twoupfree/free2up/twoup）本站少见但保留
+    downloadvolumefactor:
+      selector: td
+      case:
+        font.free2up: 0
+        font.twoupfree: 0
+        font.free: 0
+        font.halfdown: 0.5
+        font.thirtydown: 0.3
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        font.free2up: 2
+        font.twoupfree: 2
+        font.twoup: 2
+        "*": 1
+    free_deadline:
+      selector: 'font.free,font.free2up,font.twoupfree'
+      attribute: onmouseover
+      filters:
+        - name: re_search
+          args: [ 'title="(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"', 1 ]

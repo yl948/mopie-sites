@@ -1,0 +1,42 @@
+# M-Team（馒头）kp.m-team.cc — API 类型站点
+# 适配: 2026-09 实测
+#
+# 为什么必须走 API（type: api）：
+#   kp.m-team.cc 是 SPA，/、/torrents.php、/browse.php、/getusertorrentlistajax.php
+#   全部返回同一个约 10KB 的 JS 壳，服务端不再输出种子列表 —— cookie + HTML 解析无解。
+#
+# 三个实测坑：
+#   1. WAF 拦非浏览器 UA：默认 curl UA 请求会被 302 到 https://www.google.com
+#      （看着像 IP 封锁，其实是 UA 判定）。所以本站必须显式声明 ua。
+#   2. 搜索接口吃 JSON；genDlToken 只吃 form 编码（站点前端默认用 FormData）。
+#      用 JSON 调 genDlToken 会报「參數錯誤」。
+#   3. 凭证是 API 密钥（x-api-key），不是 cookie，也不是用户名密码。
+#
+# 认证：allow_auth_type 决定前端能选哪些认证方式；M-Team 只能选 API 密钥。
+id: mteam
+name: 馒头
+domain: https://kp.m-team.cc/
+type: api
+allow_auth_type:
+  - api_key
+
+# 站点级 UA（不带会被 WAF 302 到 google.com）
+ua: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+
+api:
+  provider: mteam
+  base_url: https://api.m-team.cc
+  search_path: /api/torrent/search          # 种子列表（JSON）
+  profile_path: /api/member/profile         # 验证/用户信息（JSON）
+  download_path: /api/torrent/genDlToken    # 单条换链（form 编码！有频率限制，只做兜底）
+  rss_path: /api/rss/genlink                # 批量换链：拿带签名的 RSS 地址
+  detail_url: https://kp.m-team.cc/detail/{id}
+  auth_header: x-api-key
+  page_size: 100       # 每页条数（实测 200 也接受）
+  pages: 2             # 拉取页数
+  download_limit: 5    # 单条 genDlToken 兜底额度（批量走 RSS feed，一次 100 条）
+
+# 下载链接的限制（实测）：
+#   dlv2 令牌有效期很短，约十几分钟就报「連結不可用！ 超出有效期」，所以链接必须
+#   每轮刷新，不能当成永久地址存着。批量取靠 /api/rss/genlink + RSS dl=1 feed，
+#   一次 100 条；单条 /api/torrent/genDlToken 批量调会被判「請求過於頻繁」。
