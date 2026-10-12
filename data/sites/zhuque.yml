@@ -1,0 +1,24 @@
+# 朱雀 zhuque.in — TNode（SPA + JSON API）
+# 页面是空壳，不能按 NexusPHP 解析。认证走 Cookie，下载地址另要 Torrent Key。
+# 这两个都在站点管理页填写，不要写进本文件：
+#   Cookie      -> 密码列（auth_method: cookie）
+#   Torrent Key -> 用户名列
+# RSS Key 不需要。下载地址是 /api/torrent/download/{id}/{torrentKey}。
+id: zhuque
+name: 朱雀
+domain: https://zhuque.in/
+type: api
+allow_auth_type:
+  - cookie
+  - torrent_key
+
+ua: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+
+api:
+  provider: zhuque
+  base_url: https://zhuque.in
+  profile_path: /api/user/getMainInfo
+  search_path: /api/torrent/search
+  detail_url: https://zhuque.in/torrent/info/{id}
+  page_size: 50
+  pages: 1

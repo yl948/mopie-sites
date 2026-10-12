@@ -1,0 +1,196 @@
+# 朋友 keepfrds — NexusPHP（新版皮肤：Tailwind + Classic DOMTT 混合，源码无 tbody）
+# 适配: 2026-10-07 实测侦察（index / torrents / torrents?page=1 各抓一次，未实测 verify/搜索）。
+# 列: 1类型 2标题 3评论 4时间 5大小 6种子 7下载 8完成 9发布者（size=5 seeders=6 leechers=7）
+# 结构要点:
+# - 源码无 tbody（同 audiences/agsv），列表选择器照 audiences 写法
+# - 嵌套表 2 格: td0=标题格(td.embedded，内含隐藏海报 div.browse_imdb_poster + 标题 + <br/> 后裸文本副标题)
+#               td1=右侧操作格(下载/收藏/IMDb 图标/促销 img)
+# - 促销 img 全在右侧操作格: pro_free / pro_50pctdown 带 onmouseover 截止(domTT, HTML 转义);
+#   pro_nl=中性种子(不计上传下载魔力, 无 onmouseover, 恒无截止)
+# - userinfo 全是 span.color_*（不是 kufei 的 font!）; 分享率数值是裸文本; 上传/下载各有独立 span.uploaded/.downloaded
+# - 做种/下载数在 a[href*="option-torrents=3/5"] 的文本里（图标是 <i> 不是 <img>，kufei 的 img[alt] 写法不适用）
+# - incldead 语义与标准 NexusPHP 相反: 0=包括断种(全部) 1=仅活种 2=仅断种 → 这里必须写 0
+# - 下载链接 download.php?id=N 无 passkey（cookie 鉴权）; dllist=1#seeders/#leechers 锚点存在
+id: keepfrds
+name: 朋友
+domain: https://pt.keepfrds.com/
+encoding: UTF-8
+
+login:
+  test:
+    # 本站退出是 JS form 提交（无 a[href*=logout]），Mopie 登录判定实际检测 info_block（pitfalls #25）
+    selector: table[id="info_block"]
+
+# 分类来自搜索表单复选框（cat401-425 + cat300），与种子行 img alt 一致（2026-10-07 实测）
+# cat300=回收站，刻意不配置：避免 Other 搜索把回收站一并带上
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片-传记" }
+  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动画" }
+  - { id: 406, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "MV" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他" }
+  - { id: 414, cate_level1: Other, cate_level2: Other, cate_level2_desc: "电子书" }
+  - { id: 415, cate_level1: Other, cate_level2: Audio, cate_level2_desc: "有声读物" }
+  - { id: 420, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "演唱会-音乐剧" }
+  - { id: 421, cate_level1: TV, cate_level2: TV, cate_level2_desc: "舞台" }
+  - { id: 422, cate_level1: Other, cate_level2: Other, cate_level2_desc: "软件" }
+  - { id: 423, cate_level1: Other, cate_level2: Other, cate_level2_desc: "游戏" }
+  - { id: 424, cate_level1: Other, cate_level2: Other, cate_level2_desc: "偶像" }
+  - { id: 425, cate_level1: Other, cate_level2: Other, cate_level2_desc: "鲨鱼" }
+
+userinfo:
+  path: https://pt.keepfrds.com/index.php
+  item:
+    selector: table[id="info_block"]
+  fields:
+    uid:
+      default_value: 0
+      selector: a[href*="userdetails.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      # 链接 class 编码等级（实测 ExtremeUser_Name ↔ 等级名 "Extreme User"）
+      default_value: ''
+      selector: a[href*="userdetails.php?id="]
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: a[href*="userdetails.php?id="] b
+    share_ratio:
+      # 数值是 span 后的裸文本节点，只能 next_sibling（kufei 同款思路，但本站是 span 不是 font）。
+      # info_block 源码缩进为多空格，verifier 按 \s{2,} 切分 → 干净取到 "4.415"。
+      # next_sibling 分支会跳过 filters（pitfalls #21），故不放 filters；站点无"无限"分享率形态。
+      default_value: ''
+      selector: "span.color_ratio"
+      method: next_sibling
+    uploaded:
+      # 数值在相邻兄弟 span.uploaded（"30.926 TiB"）。用 "+ span" 直接选中承载元素，
+      # 不依赖空白切分，filters 也能正常执行（对照 pitfalls #21/#22）
+      default_value: 0
+      selector: "span.color_uploaded + span"
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    downloaded:
+      default_value: 0
+      selector: "span.color_downloaded + span"
+      filters:
+        - name: replace
+          args: [ '无限','inf' ]
+    seeding:
+      # <a href="/torrents.php?option-torrents=3"><i alt="Torrents seeding" title="当前做种"></i> 43</a>
+      # 数字在 a 的文本里；info_block 内该选择器唯一（实测=1）
+      default_value: 0
+      selector: 'a[href*="option-torrents=3"]'
+    leeching:
+      default_value: 0
+      selector: 'a[href*="option-torrents=5"]'
+
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    # 搜索表单分类是 cat401=1 复选框形态（同 pterclub），非 cat=401 也非 cat[]
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    # 本站 incldead 反语义: 0=包括断种(全部) 1=仅活种 2=仅断种；写 0 才等于其他站的 incldead=1
+    incldead: 0
+    spstate: "{% if query.free %}2{% else %}0{% endif %}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{%endif%}"
+    search_mode: 0
+    sort: "{{ query.sort }}"
+    type: "{{ query.type }}"
+    page: "{{ query.page }}"
+
+# 实测 2026-10-07: page=0(id 2782413-2782464) 与 page=1(2782361-2782412) 零重叠、id 连续，
+# 默认按发布时间倒序，两页均无置顶行 → skip_page1: false
+torrents:
+  list:
+    # 源码无 tbody（goquery 补隐式 tbody），照 audiences/agsv 写法，去掉 " > "
+    selector: table.torrents tr:has(table.torrentname)
+  fields:
+    id:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title_default:
+      selector: table.torrentname a[href^="details.php?id="]
+    title_optional:
+      optional: true
+      selector: table.torrentname a[title][href^="details.php?id="]
+      attribute: title
+    title:
+      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    # 副标题 = 标题格 <br/> 后的裸文本（个别行被 span 包裹）。解析器 extractNexusSubject
+    # 自动取最后一个 br 后的纯文本（实测 50/50 行干净），故不写 subject 字段——
+    # 写了也会被覆盖（pitfalls #19b），kufei 的 td.embedded + contents:-1 在本站会取到行尾信息图标。
+    category:
+      selector: td:first-child a[href^="?cat="]
+      attribute: href
+      filters:
+        - name: replace
+          args: ["?", ""]
+        - name: querystring
+          args: ["cat"]
+    details:
+      selector: table.torrentname a[href^="details.php?id="]
+      attribute: href
+    download:
+      # 无 passkey，纯 download.php?id=N（cookie 鉴权）
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+    size:
+      selector: td.rowfollow:nth-child(5)
+    date_added:
+      # 时间格内含 <br/>（"17时<br/>27分"），绝对时间在 span[title]
+      selector: td.rowfollow:nth-child(4) > span[title]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    seeders:
+      selector: 'a[href*="#seeders"]'
+    leechers:
+      selector: 'a[href*="#leechers"]'
+    snatched:
+      selector: 'a[href*="snatched"], a[href*="viewsnatches"]'
+    downloadvolumefactor:
+      selector: td
+      case:
+        img.pro_free: 0
+        img.pro_free2up: 0
+        img.pro_50pctdown: 0.5
+        img.pro_50pctdown2up: 0.5
+        img.pro_30pctdown: 0.3
+        img.pro_nl: 0          # 中性种子（不计上传下载魔力）
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        img.pro_free2up: 2
+        img.pro_50pctdown2up: 2
+        img.pro_2up: 2
+        img.pro_nl: 0          # 中性种子不计上传
+        "*": 1
+    # 本站无彩色标签 span（page0/page1 均 0 命中，选择器恒空，保留作兜底）；
+    # 行尾 font.recommended="限时禁转" 是发布规则标记，不是折扣也不是标签，未映射
+    tags:
+      selector: table.torrentname span[style*="background-color"]
+    # 截止在促销 img 的 onmouseover（domTT，HTML 转义，goquery 取 attr 时会反转义）。
+    # pro_nl 无 onmouseover：该字段为空且 dlf<1 时解析器兜底扫 span[title] → 误填发布时间
+    #（pitfalls #19，仅缓存页显示瑕疵，不影响免费判定）
+    free_deadline:
+      selector: img.pro_free,img.pro_free2up,img.pro_50pctdown,img.pro_50pctdown2up
+      attribute: onmouseover
+      filters:
+        - name: re_search
+          args: [ 'title="(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"', 1 ]

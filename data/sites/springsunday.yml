@@ -1,0 +1,151 @@
+id: springsunday
+name: 春天
+domain: https://springsunday.net/
+encoding: UTF-8
+
+# verifier 实际用 a[href*='logout'] 或 [id='info_block'] 判定登录状态，这里仅作文档
+login:
+  test:
+    selector: a[href*="logout"], a[href="usercp.php"]
+
+# 分类 ID 来自 2026-09-27 实测（种子行 ?cat=NNN 的 img alt + 搜索表单 catNNN 复选框）
+# 注意 504 不存在（站上已无该类）
+category_mappings:
+  - { id: 501, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 502, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 503, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录" }
+  - { id: 505, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 506, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 507, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐视频" }
+  - { id: 508, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 509, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他类型" }
+  - { id: 510, cate_level1: Other, cate_level2: Audio, cate_level2_desc: "有声" }
+
+# 经典 NexusPHP info_block（CMCT 系皮肤）。字段挤在同一容器里，
+# 但源码字段之间有换行/多空格，next_sibling 的切分规则能正确取出：
+#   分享率: 5.666 / 上传量: 6.756 TB / 下载量: 1.192 TB
+userinfo:
+  path: https://springsunday.net/index.php
+  item:
+    selector: 'table#info_block'
+  fields:
+    uid:
+      default_value: 0
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: 'a[href*="userdetails.php?id="] b span'
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: 'a[href*="userdetails.php?id="] b'
+    share_ratio:
+      default_value: ''
+      selector: 'font.color_ratio'
+      method: next_sibling
+    uploaded:
+      default_value: 0
+      selector: 'font.color_uploaded'
+      method: next_sibling
+    downloaded:
+      default_value: 0
+      selector: 'font.color_downloaded'
+      method: next_sibling
+    # 做种/下载数在这个皮肤里是 <img alt="Torrents seeding" />61 这种“裸文本节点”，
+    # 既不是兄弟元素也不是可控容器（img 的父元素是整个欢迎区），next_sibling 会取到
+    # “欢迎回来,”。且 Mopie 的 sites 表本就没有这两个列（verifier 返回后即丢弃），
+    # 所以直接不配，避免往接口回包里塞垃圾值。
+# 搜索为经典 NexusPHP 参数；分类筛选是同名前缀 catNNN=1（不是 cat[]=）
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{{query.keyword}}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{% endif %}"
+    search_mode: 0
+    incldead: 1
+    spstate: 0
+    inclbookmarked: 0
+    sort: "{{query.sort}}"
+    type: "{{query.type}}"
+    page: "{{query.page}}"
+
+# 列表结构实测（经典 NexusPHP 9 列，列表表 = table.torrents）：
+#   1类型 2标题格 3评论 4时间 5大小 6种子 7下载 8完成 9发布者
+#   外层 td 全为 class=rowfollow；标题格内嵌套 table.torrentname 用 class=embedded
+#   标题：<a title=... href="details.php?id=">；下载链接在标题格右侧的 embedded 格里（自带 passkey）
+#   折扣：<font class="free|twoup|twoupfree|halfdown|twouphalfdown|thirtypercent">，截止在 (限时<span title=...>)
+#   标签：span.torrent-tag（CMCT/官方/中字…）；副标题是 smalldescr 里唯一无 class 的 span
+#   page=0 与 page=1 内容零重叠（skip_page1: false），每页 100 条
+torrents:
+  list:
+    selector: 'table.torrents tr:has(table.torrentname)'
+  fields:
+    id:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title:
+      selector: 'a[href^="details.php?id="][title]'
+    subject:
+      selector: 'div.torrent-smalldescr > span[title]:not([class])'
+    category:
+      selector: 'td.rowfollow a[href^="?cat="]'
+      attribute: href
+      filters:
+        - name: replace
+          args: [ '?', '' ]
+        - name: querystring
+          args: [ 'cat' ]
+    details:
+      selector: 'a[href^="details.php?id="][title]'
+      attribute: href
+    download:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+    size:
+      selector: 'td.rowfollow:nth-child(5)'
+    date_added:
+      selector: 'td.rowfollow:nth-child(4) > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]
+    seeders:
+      selector: 'a[href*="dllist=1#seeders"]'
+    leechers:
+      selector: 'a[href*="dllist=1#leechers"]'
+    snatched:
+      selector: 'a[href^="viewsnatches.php?id="]'
+    downloadvolumefactor:
+      selector: td
+      case:
+        "font.free": 0
+        "font.twoupfree": 0
+        "font.twouphalfdown": 0.5
+        "font.halfdown": 0.5
+        "font.thirtypercent": 0.3
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        "font.twoup": 2
+        "font.twoupfree": 2
+        "font.twouphalfdown": 2
+        "*": 1
+    tags:
+      selector: 'span.torrent-tag'
+    free_deadline:
+      selector: 'span > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]

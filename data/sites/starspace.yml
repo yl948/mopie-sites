@@ -1,0 +1,109 @@
+# 星空影社 star-space.net — 全定制 PHP 框架（非 NexusPHP，p_* 模块制），Cloudflare 前置
+# 适配: 2026-10-07 实测。列表页 /p_torrent/video_list_g.php（单页无分页，无置顶）。
+# 结构: 每个影视组一张 <table id='gm_table_torrent'>（id 重复使用），
+#   行1 = tr#gm_tr_split（分辨率组头 1080/2160），行2+ = tr#gm_tr_item（每行一个种子版本）。
+#   行内字段全有语义 id：gm_td_size/source/code/hdr/icon/percent/name/user。
+# 下载链 ../p_torrent/download.php?tid=N&passkey=...（页面自带 passkey）。
+#
+# 【引擎选择——必须用结构体 YAML 模式（title.selector 非空）】
+# 插件引擎（ParseListHTML→ParseTorrents）的 isTorrentOuterRow 硬编码要求行内有
+# a[href*="details.php"]，本站详情链是 video_detail.php → 插件引擎恒 0 行。
+# 结构体解析器（parseTorrentsYAML）无此门槛，但限制：不支持 filters/case/text 模板、
+# 不写 size_bytes（恒 0）、free 取选择器原文。
+#
+# 【站点限制（非配置错）】
+# - 行内无分类（页面级 cat=mo/tv/an/do/mv/sp/ot 参数）→ category 不配，前端分类过滤对本站无效
+# - 无绝对发布时间（只有相对"17时26分"）→ date_added 不配，publish_at 为空
+# - 免费标记 span#free 文本"(免费剩余1日6时)"是相对时长 → free_deadline 无法解析
+# - 体积 "21.37 G"（无 B）→ size_bytes 恒 0（结构体模式无 filters 可补），size 文本保留
+# - 搜索响应慢（9-40s 波动）+ CF 对 Go 指纹排队（pitfalls #29）→ verify/sync/拉取重试撞窗口
+id: starspace
+name: 星空影社
+domain: https://star-space.net/
+encoding: UTF-8
+
+login:
+  test:
+    selector: a[href*="logout.php"]
+
+# 分类是页面级参数（cat=mo/tv/an/do/mv/sp/ot），行内不可提取；仅作文档记录
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 403, cate_level1: Other, cate_level2: Other, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动画" }
+  - { id: 406, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "MV" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+
+userinfo:
+  path: https://star-space.net/p_index/index.php
+  item:
+    selector: body
+  fields:
+    uid:
+      default_value: 0
+      selector: a[href*="user_detail.php?uid="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    username:
+      default_value: '未知用户名'
+      selector: a[href*="user_detail.php?uid="] span.uc1
+    # 上传文本在 span 内的 a 里，containsOwn 不匹配子孙文本（实测取 0），必须 :contains
+    uploaded:
+      default_value: 0
+      selector: 'span#user_info:contains("上传：")'
+      filters:
+        - name: re_search
+          args: [ '上传[：:]\s*([\d.]+\s*[KMGTP]i?B?)', 1 ]
+    downloaded:
+      default_value: 0
+      selector: 'span#user_info_no_hover:containsOwn("下载：")'
+      filters:
+        - name: re_search
+          args: [ '下载[：:]\s*([\d.]+\s*[KMGTP]i?B?)', 1 ]
+    seeding:
+      default_value: 0
+      selector: 'span#user_info a:has(img[alt="做种数"])'
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    leeching:
+      default_value: 0
+      selector: 'span#user_info a:has(img[alt="下载数"])'
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+
+search:
+  paths:
+    - path: p_torrent/video_list_g.php
+      method: get
+  query:
+    # 站点搜索: search=关键词, area=name(标题/副标题)/imdb/douban/...（无 search_area/sort/incldead 概念）
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    area: "{% if query.imdb_id %}imdb{% else %}name{% endif %}"
+
+torrents:
+  list:
+    selector: 'tr#gm_tr_item'
+  fields:
+    # 结构体模式（title.selector 非空）——见文件头引擎选择说明
+    title:
+      selector: 'td#gm_td_name a[href*="video_detail.php?tid="]'
+    free:
+      selector: 'span#free'
+    size:
+      selector: 'td#gm_td_size'
+    seeders:
+      selector: 'a:has(img[alt="做种数"])'
+    leechers:
+      selector: 'a:has(img[alt="下载数"])'
+    details:
+      selector: 'a[href*="video_detail.php?tid="]'
+      attribute: href
+    download:
+      selector: 'a[href*="download.php?tid="]'
+      attribute: href

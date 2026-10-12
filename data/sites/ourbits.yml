@@ -1,0 +1,204 @@
+# 堡站 ourbits.club — NexusPHP（JWT cookie 认证 + Cloudflare，无 c_secure_* 全套）
+# 适配: 2026-10-07 实测侦察（index / torrents p0 / p1 / cat[]=411 过滤 / search=NCIS 关键字 /
+#       search=tt107206 IMDb 搜索，各实测一次；未实测 sort/type 逐值与 verify 全流程）。
+# 认证: ourbits_jwt cookie（JWT aud=uid），下载链接无 passkey（cookie 鉴权）。
+# UA: Chrome/124 与 Firefox/126 实测均有登录态（200 + logout + info_block）；cf_clearance 绑定
+#     获取时的 UA，凭证侧须用与 cf_clearance 配对的那个 UA。ua 字段填 Chrome。
+# 列: 1类型 2标题 3评论 4时间 5大小 6种子 7下载 8完成 9进度 10发布者 —— 比经典多一列"进度"，
+#     但插在完成数之后，size/seeders/leechers/snatched 仍= nth-child(5)/(6)/(7)/(8)，发布者=第10列。
+# 结构: 源码无 tbody（同 keepfrds/audiences）；内层 table.torrentname 是 5 格 embedded
+#       （标题主格|30px空白|审核/RSS图标|IMDb/豆瓣评分|下载/收藏图标），无海报格，首格即标题格。
+# 置顶: img[alt="Sticky"]（src=pic/sticky1/2/3.png，title=一级置顶/置顶/高级置顶；新种自动高级置顶）。
+#       注意"审核"图标 wsh/ysh.png 的 alt 也是 "Sticky"，区分置顶要看 src/title。
+#       行 class sticky_top_more/sticky_top/sticky_normal/sticky_blank 与置顶级别对应（CMCT 系常态类名）。
+# 促销: img.pro_free（domTT onmouseover 截止 + 真实 DOM td.embedded>b>span[title] 截止，6/6 齐全）/
+#       img.pro_50pctdown（无 onmouseover 也无截止 span，50/51 页采样 0 命中截止）。
+#       spstate 下拉显示站点还支持 2X/2X免费/2X 50%/30%（本次抓取未观测到对应行，case 已预留）。
+#       font.hot=热门、font.new=新、font.gray 均非折扣。
+# 标签: a[href^="?tags[]="] 里的 span.tag tag-*（官方/DIY/国语/中字/禁转/HDR10+ 等 12 种），
+#       既非 span.tags 也非 background-color 彩色 span，解析器两套内置路子都不覆盖 → 必须显式写 tags。
+# 副标题: 标题格 <br/> 后、标签 div 之后的裸文本节点（HTML5 解析下 td.embedded 最后一个子节点）。
+# userinfo: 分享率是 span.color_ratio、上传/下载是 font.color_*（混用），数值均为裸文本走 next_sibling；
+#       做/下载活动数在 img[alt="Torrents seeding/leeching"] 后裸文本（verifier 对 img+next_sibling 有
+#       抓整段欢迎语的已知怪癖，该两值 sites 表不落库，仅展示层，不影响搜索/拉取）。
+# incldead 标准语义（select 实测）: 0=包括断种 1=活种(站点默认) 2=断种。
+# 搜索分类参数是 cat[] 数组（同 HHan；实测 cat[]=411 返回 100/100 动漫），非 cat401=1。
+id: ourbits
+name: 堡站
+domain: https://ourbits.club/
+encoding: UTF-8
+ua: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+
+login:
+  test:
+    # 实际退出链接是 logout.php?token=...（精确 href="logout.php" 匹配不到，要用子串匹配）；
+    # Mopie 登录判定实际写死检测 a[href*='logout'] / #info_block，本站两者都命中（pitfalls #25）
+    selector: a[href*="logout.php"]
+
+# 分类全集来自搜索表单 cat[] 复选框（11 类）与行内 ?cat=NNN 一致（2026-10-07 实测）
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "3D电影" }
+  - { id: 405, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集合集" }
+  - { id: 410, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 411, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
+  - { id: 412, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集(单集)" }
+  - { id: 413, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 414, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "MV" }
+  - { id: 415, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 416, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 419, cate_level1: Music, cate_level2: Audio/Video, cate_level2_desc: "演唱会" }
+
+userinfo:
+  path: https://ourbits.club/index.php
+  item:
+    selector: table[id="info_block"]
+  fields:
+    uid:
+      default_value: 0
+      selector: a[href*="userdetails.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    # 链接 class 编码等级（实测 VeteranUser_Name ↔ Veteran User）
+    user_group:
+      default_value: ''
+      selector: a[href*="userdetails.php?id="]
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: a[href*="userdetails.php?id="] b
+    # 数值是 span 后的裸文本节点（"分享率：</span> 4.531"），只能 next_sibling；
+    # next_sibling 分支会跳过 filters（pitfalls #21），故不放 filters；实测预期 "4.531"，无"无限"形态
+    share_ratio:
+      default_value: ''
+      selector: "span.color_ratio"
+      method: next_sibling
+    # 注意混用：分享率是 span、上传/下载是 font。uploaded 的值与下载量标签之间无空白边界，
+    # next_sibling 会吞进“下载量：656.02 GB”（雷区同款，pitfalls #21 变体）→ 容器全文 + re_search 捕获组
+    uploaded:
+      default_value: 0
+      selector: "span.medium"
+      filters:
+        - name: re_search
+          args: [ '上传量[：:]\s*([\d.]+\s*[KMGTP]i?B?)', 1 ]
+    downloaded:
+      default_value: 0
+      selector: "font.color_downloaded"
+      method: next_sibling
+    # 做/下载活动数不配：img 后是裸文本节点，verifier next_sibling 会抓整段欢迎语（同春天先例），
+    # 且 sites 表无这两列
+
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    # 分类是 cat[] 数组参数（同 HHan；cat[]=411 实测 100/100 全为动漫）
+    $raw: "{% for c in query.cates %}cat[]={{c}}&{% endfor %}"
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    # select 实测: 0=包括断种 1=活种(默认) 2=断种 —— 标准语义（非 keepfrds 反语义），写 1
+    incldead: 1
+    # select 实测: 0全部 1普通 2免费 3 2X 4 2X免费 5 50% 6 2X 50% 7 30%
+    spstate: "{% if query.free %}2{% else %}0{% endif %}"
+    # select 实测: 0=标题 3=发布者 4=IMDb链接 5=豆瓣链接（无 1/2）；
+    # search=tt107206&search_area=4 实测命中 10 条同片；search=NCIS&search_area=0 实测 64/64 命中
+    search_area: "{% if query.imdb_id %}4{% else %}0{% endif %}"
+    # 0=与 1=或 2=准确
+    search_mode: 0
+    # sort/type 不在搜索表单里，按 NexusPHP 惯例透传（未逐值实测，见报告风险项）
+    sort: "{{ query.sort }}"
+    type: "{{ query.type }}"
+    page: "{{ query.page }}"
+
+# 实测 2026-10-07: page=0(id 357567→357537) 与 page=1(id 357536→357424) 各 100 条、零重叠、id 连续，
+# 置顶（新种自动高级置顶 46 行）只出现在 p0 内部 → skip_page1: false
+torrents:
+  list:
+    # 源码无 tbody（101 个直接 tr 子元素），照 keepfrds/audiences 写法去掉 "> tbody >"
+    selector: table.torrents tr:has(table.torrentname)
+  fields:
+    id:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title_default:
+      selector: table.torrentname a[href^="details.php?id="]
+    title_optional:
+      optional: true
+      selector: table.torrentname a[title][href^="details.php?id="]
+      attribute: title
+    title:
+      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    # 副标题 = 标题格 <br/> 后、标签 div 之后的裸文本节点。首个 embedded 格就是标题格（无海报格），
+    # 解析器 extractNexusSubject 会覆盖 YAML 值（pitfalls #19b）：HTML5 解析下最后子节点即副标题文本，
+    # 预期干净；若出现"标签+副标题"粘连属解析器兜底行为（#17b），仅影响显示，raw_subject/tags 不受影响
+    subject:
+      selector: table.torrentname td.embedded:has(a[href*='details.php'])
+      contents: -1
+    category:
+      selector: td:first-child a[href^="?cat="]
+      attribute: href
+      filters:
+        - name: replace
+          args: ["?", ""]
+        - name: querystring
+          args: ["cat"]
+    details:
+      selector: table.torrentname a[href^="details.php?id="]
+      attribute: href
+    # download.php?id=N 无 passkey（JWT cookie 鉴权），链接在 torrentname 第 5 格图标上
+    download:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+    # 固定 10 列布局实测 100/100 行成立；leechers=0 时无 #leechers 锚点（裸文本 0）、
+    # 少数行 snatched 无 viewsnatches 链接 → 人数/完成全部走 nth-child（pttime 先例），
+    # a[href*="#seeders"/"#leechers"/dllist=1] 锚点在 >0 时存在（可作人工核对）
+    size:
+      selector: td.rowfollow:nth-child(5)
+    date_added:
+      # 时间格文本 "17时<br>41分"，绝对时间在 span[title]
+      selector: td.rowfollow:nth-child(4) > span[title]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    seeders:
+      selector: td.rowfollow:nth-child(6)
+    leechers:
+      selector: td.rowfollow:nth-child(7)
+    snatched:
+      selector: td.rowfollow:nth-child(8)
+    downloadvolumefactor:
+      selector: td
+      case:
+        img.pro_free: 0
+        img.pro_free2up: 0
+        img.pro_50pctdown: 0.5
+        img.pro_50pctdown2up: 0.5
+        img.pro_30pctdown: 0.3
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        img.pro_free2up: 2
+        img.pro_50pctdown2up: 2
+        img.pro_2up: 2
+        "*": 1
+    # span.tag tag-xx（包在 ?tags[]=xx 链接里），非 span.tags 非 background-color 彩色 span，
+    # 解析器内置两套路子都不覆盖 → 必须显式写
+    tags:
+      selector: table.torrentname span.tag
+    # 免费截止优先真实 DOM span（同猫站形态②：td.embedded b > span[title]；发布时间 span 的父是
+    # td.rowfollow 不冲突；免费行 6/6 命中）。备选：img.pro_free 的 onmouseover(domTT) 同样可解析。
+    # 50% 行无任何截止（无 onmouseover 无 span）→ dlf<1 时解析器兜底会拿发布时间顶上
+    #（pitfalls #19，纯显示瑕疵，不影响免费判定）
+    free_deadline:
+      selector: td.embedded b > span[title]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"

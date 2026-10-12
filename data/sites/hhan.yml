@@ -1,0 +1,167 @@
+id: hhan
+name: 憨憨
+domain: https://hhan.club/
+encoding: UTF-8
+
+login:
+  test:
+    selector: a[href="logout.php"]
+
+# 分类 ID 来自 2026-09-23 实测（torrents.php 导航下拉；行内为 ?cat[]=NNN）
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "电视剧" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 412, cate_level1: TV, cate_level2: TV, cate_level2_desc: "短剧" }
+
+# 这是 HHan 皮肤（Tailwind 重写，全站没有 <table>），用户信息在头像悬浮面板 #user-info-panel：
+#   <div class="..."><img ... alt="分享率"> <div>[分享率]:&nbsp;1.819</div></div>
+#   <div class="..."><img ... alt="上传">&nbsp;8.423 TB</div>
+# next_sibling 取的是「父元素全文」（img 无文本 → strings.Index(全文,"")=0），
+# 所以只需保证 img 的父元素里只有这一个值。
+userinfo:
+  path: https://hhan.club/index.php
+  item:
+    selector: 'div[id="user-info-panel"]'
+  fields:
+    uid:
+      default_value: 0
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: 'a[href*="userdetails.php?id="] b'
+    share_ratio:
+      default_value: ''
+      selector: 'img[alt="分享率"] + div'
+      filters:
+        - name: re_search
+          args: [ '[\d.]+', 0 ]
+    uploaded:
+      default_value: 0
+      selector: 'img[alt="上传"]'
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限', 'inf' ]
+    downloaded:
+      default_value: 0
+      selector: 'img[alt="下载"]'
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限', 'inf' ]
+    seeding:
+      default_value: 0
+      selector: 'img[alt="做种数"]'
+      method: next_sibling
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    leeching:
+      default_value: 0
+      selector: 'img[alt="下载数"]'
+      method: next_sibling
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+
+# 关键字参数是 search（不是 keyword，实测 keyword= 会被忽略）；search_area: 0标题 1简介 3发布者 4IMDb
+# fetch 会取 paths[0].path 当列表基址再拼 ?page=N，所以 path 里不能带查询串
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat[]={{c}}&{% endfor %}"
+    search: "{{query.keyword}}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{% endif %}"
+    incldead: 1
+    spstate: 0
+    inclbookmarked: 0
+    sort: "{{query.sort}}"
+    type: "{{query.type}}"
+    page: "{{query.page}}"
+
+# 列表结构实测：每棵种子是 div.torrent-table-sub-info（页面无 table/tr），100 条/页，默认按发布时间倒序
+#   类型 ?cat[]=NNN | 标题 a.torrent-info-text-name | 副标题 div.torrent-info-text-small_name
+#   大小 div.torrent-info-text-size | 时间 div.torrent-info-text-added > span[title]
+#   做种 div.torrent-info-text-seeders | 下载 div.torrent-info-text-leechers（为 0 时无 <a>，取 div 文本更稳）
+#   完成 div.torrent-info-text-finished a | 下载按钮 div.torrent-manage a[href^="download.php"]
+#   促销 [<font class='free'>免费</font>] + 剩余时间 span[title]；折扣类名见 theme.css: free/twoup/twoupfree/halfdown/twouphalfdown/thirtypercent
+torrents:
+  list:
+    selector: 'div.torrent-table-sub-info'
+  fields:
+    id:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title:
+      selector: 'a.torrent-info-text-name'
+    subject:
+      selector: 'div.torrent-info-text-small_name'
+    category:
+      selector: 'div.torrent-cat a'
+      attribute: href
+      filters:
+        - name: replace
+          args: [ '?', '' ]
+        - name: querystring
+          args: [ 'cat[]' ]
+    details:
+      selector: 'a.torrent-info-text-name'
+      attribute: href
+    download:
+      selector: 'div.torrent-manage a[href^="download.php"]'
+      attribute: href
+    size:
+      selector: 'div.torrent-info-text-size'
+    date_added:
+      selector: 'div.torrent-info-text-added > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]
+    seeders:
+      selector: 'div.torrent-info-text-seeders'
+    leechers:
+      selector: 'div.torrent-info-text-leechers'
+    snatched:
+      selector: 'div.torrent-info-text-finished a'
+    downloadvolumefactor:
+      selector: div
+      case:
+        "font.free": 0
+        "font.twoupfree": 0
+        "font.twouphalfdown": 0.5
+        "font.halfdown": 0.5
+        "font.thirtypercent": 0.3
+        "*": 1
+    uploadvolumefactor:
+      selector: div
+      case:
+        "font.twoup": 2
+        "font.twoupfree": 2
+        "font.twouphalfdown": 2
+        "*": 1
+    tags:
+      selector: 'span.tag'
+    free_deadline:
+      selector: 'span > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]

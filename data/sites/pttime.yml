@@ -1,0 +1,192 @@
+# PT时间 pttime.org — NexusPHP（PTT-NP 深度定制皮肤）
+# 适配: 2026-10-07 实测。12 列布局: 1类型 2标题 3PTR(隐藏) 4评论 5存活 6大小 7做种 8下载 9完成 10进度 11发布者 12行为
+# 与经典 9 列完全不同：size/seeders/leechers/snatched = nth-child(6)/(7)/(8)/(9)。
+# 无 tbody（源码 tr 是 table 直接子元素），列表选择器不能用 "tbody > tr"。
+# 分类图标是 span.category.c_xxx（title 属性），不是 img；促销是 font.promotion free/halfdown/twouphalfdown。
+# 发布绝对时间在「存活」列 span[title]（第 5 格），不在时间列。
+# 【重要】CF/UA：cf_clearance 绑 Firefox UA。Chrome/124 UA 下 CF 放行但源站拒登录态（302 到 login.php）；
+# Firefox/126 UA 登录正常。ua: 字段必须保持下面的 Firefox UA，凭证 Cookie 需含 cf_clearance。
+id: pttime
+name: PT时间
+domain: https://www.pttime.org/
+encoding: UTF-8
+ua: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0
+
+login:
+  test:
+    selector: a[href="logout.php"]
+
+# 分类来自搜索表单 catNNN=1 复选框 + 行内 ?cat=NNN / span.category title（2026-10-07 实测全集）
+# cat100 = Trend(推荐) 是虚拟筛选，不是种子分类，不配。
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "连续剧" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 405, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 406, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
+  - { id: 407, cate_level1: Other, cate_level2: Other, cate_level2_desc: "婴幼儿童" }
+  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐" }
+  - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "曲艺戏曲" }
+  - { id: 410, cate_level1: Other, cate_level2: Other, cate_level2_desc: "AI" }
+  - { id: 411, cate_level1: Other, cate_level2: Other, cate_level2_desc: "知识/书刊" }
+  - { id: 412, cate_level1: Other, cate_level2: Other, cate_level2_desc: "教育" }
+  - { id: 420, cate_level1: Other, cate_level2: Other, cate_level2_desc: "编程技术" }
+  - { id: 421, cate_level1: Other, cate_level2: Other, cate_level2_desc: "游戏" }
+  - { id: 422, cate_level1: Other, cate_level2: Other, cate_level2_desc: "软件" }
+  - { id: 423, cate_level1: Other, cate_level2: Other, cate_level2_desc: "素材" }
+  - { id: 430, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他" }
+
+userinfo:
+  path: https://www.pttime.org/index.php
+  item:
+    selector: table[id="info_block"]
+  fields:
+    uid:
+      default_value: 0
+      selector: a.User_Name[href*="userdetails.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    # 等级是裸文本 "[(幼儿园)User]"，无独立元素，从欢迎语整段文本里正则抠出
+    user_group:
+      default_value: ''
+      selector: '#info_block span.medium.left'
+      filters:
+        - name: re_search
+          args: [ '\([^)]+\)User', 0 ]
+    username:
+      default_value: '未知用户名'
+      selector: a.User_Name b
+    # index.php 只显示最低分享率要求 "分享率：≥10.00"，不显示实际分享率
+    # （实际分享率在 userdetails.php「核心数据」区，如 12.644，verifier 单页抓不到，留空）
+    share_ratio:
+      default_value: ''
+    uploaded:
+      default_value: 0
+      selector: '#info_block td > div.left > span:nth-child(2)'
+      filters:
+        - name: re_search
+          args: [ '[\d.]+\s*[KMGTP]B', 0 ]
+    downloaded:
+      default_value: 0
+      selector: '#info_block td > div.left > span:nth-child(3)'
+      filters:
+        - name: re_search
+          args: [ '[\d.]+\s*[KMGTP]B', 0 ]
+    # 活动: ⬆11 ⬇0 —— 做种/下载数在同一个 span 里，用箭头字符区分
+    seeding:
+      default_value: 0
+      selector: '#info_block td > div.left > span:nth-child(4)'
+      filters:
+        - name: re_search
+          args: [ '⬆\s*(\d+)', 1 ]
+    leeching:
+      default_value: 0
+      selector: '#info_block td > div.left > span:nth-child(4)'
+      filters:
+        - name: re_search
+          args: [ '⬇\s*(\d+)', 1 ]
+
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{% if query.imdb_id %}{{query.imdb_id}}{%else%}{{query.keyword}}{% endif %}"
+    incldead: 1
+    # spstate=2(仅免费) 未实测：表单里只有隐藏 spstate=0，免费筛选值沿用经典 NexusPHP 约定
+    spstate: "{% if query.free %}2{% else %}0{% endif %}"
+    # 本站 search_area 无 0/4：1=标题&副标题（默认搜索用它），2=种子名，3=简介&目录
+    # 实测 tt 号搜索必须走 3（search_area=4 被忽略、返回全站 50 条）；IMDb 搜索靠简介里的 tt 号命中
+    search_area: "{% if query.imdb_id %}3{% else %}1{% endif %}"
+    sort: "{{ query.sort }}"
+    type: "{{ query.type }}"
+    page: "{{ query.page }}"
+
+# page=0 与 page=1 各 50 条、仅重叠 1 条（热门种 29964 两页都出现，无 img.sticky 置顶标记），skip_page1: false
+# 本站 sort 参数实测映射: 1标题 3评论 4存活(时间) 5大小 6完成 7做种 8下载 9发布者，与经典 NP 一致
+torrents:
+  list:
+    selector: table.torrents tr:has(table.torrentname)
+  fields:
+    id:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title_default:
+      selector: table.torrentname a[href^="details.php?id="]
+    title_optional:
+      optional: true
+      selector: table.torrentname a[title][href^="details.php?id="]
+      attribute: title
+    title:
+      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+    # 副标题是标题格 td.embedded 里带 title 属性的 font（<br/> 之后）；b[title]/promotion font 均无 title 不误中
+    subject:
+      selector: table.torrentname td.embedded > font[title]
+      contents: -1
+    category:
+      selector: td:first-child a[href^="?cat="]
+      attribute: href
+      filters:
+        - name: replace
+          args: ["?", ""]
+        - name: querystring
+          args: ["cat"]
+    details:
+      selector: table.torrentname a[href^="details.php?id="]
+      attribute: href
+    # 下载链接自带 passkey+uid（运行时从页面取，每用户不同，不落 YAML）
+    download:
+      selector: table.torrentname a[href^="download.php?id="]
+      attribute: href
+    # 存活列：相对时长文本，绝对发布时间在 span[title]
+    date_added:
+      selector: td.rowfollow:nth-child(5) > span[title]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
+    # 大小格内含 <br/>（"173.10<br/>GB"），解析器 extractSize 兼容（同 crabpt）
+    size:
+      selector: td.rowfollow:nth-child(6)
+    # 人数列没有全量锚点：#seeders/#leechers 锚点只在 >0 时出现，0 是裸 span.red/文本 → 全部走 nth-child
+    seeders:
+      selector: td.rowfollow:nth-child(7)
+    leechers:
+      selector: td.rowfollow:nth-child(8)
+    snatched:
+      selector: td.rowfollow:nth-child(9)
+    # 促销是 font.promotion.*（free/halfdown/twouphalfdown，另 font.promotion.bb=字幕/附件非折扣、font.hot=热门非折扣）
+    downloadvolumefactor:
+      selector: td
+      case:
+        font.free: 0
+        font.twoupfree: 0
+        font.halfdown: 0.5
+        font.twouphalfdown: 0.5
+        font.thirtypercent: 0.3
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        font.twoup: 2
+        font.twoupfree: 2
+        font.twouphalfdown: 2
+        "*": 1
+    # 标签是 span.tags（sk=4K(+)/zz=中字/xs=新手 等代码类），包在 ?tags=xx 链接里
+    tags:
+      selector: table.torrentname span.tags
+    # 免费截止：促销 font 后面的 span[title="YYYY-MM-DD HH:MM:SS"]；限定 td.embedded 避免误中存活列发布时间
+    # halfdown 行部分无截止 span → 字段为空（解析器兜底可能用发布时间顶上，纯显示问题，同 pitfalls #19）
+    free_deadline:
+      selector: td.embedded span[title^="20"]
+      attribute: title
+      filters:
+        - name: dateparse
+          args: "%Y-%m-%d %H:%M:%S"
