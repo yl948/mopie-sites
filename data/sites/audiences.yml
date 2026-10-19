@@ -9,6 +9,8 @@ id: audiences
 name: 观众
 domain: https://audiences.me/
 encoding: UTF-8
+# 页面 1MB+，站点慢时默认 30s 读取超时不够（实测 502/读超时），放宽到 60s
+timeout: 60
 
 # 注：Mopie 的 verifier 实际只看 login.required，且 [id=info_block] 存在即通过（本站无真实 logout 链接）
 login:
@@ -114,7 +116,11 @@ torrents:
       selector: table.torrentname a[title][href^="details.php?id="]
       attribute: title
     title:
-      text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
+      # 带 title 属性的链接就是完整种子名（NexusPHP details 链接的 tooltip），直接取 title 属性
+      selector: table.torrentname a[title][href^="details.php?id="]
+      attribute: title
+      # 回滚备份：原模板写法（YAML 选择器解析不支持 text 模板字段）
+      # text: "{% if fields['title_optional'] %}{{ fields['title_optional'] }}{% else %}{{ fields['title_default'] }}{% endif %}"
     # 副标题：本站用 span.torrent-subtitle-line 包住（标签+正文），
     # 正文单独在 span.torrent-subtitle-text。YAML 的 subject 会被 Go 的
     # extractNexusSubject 覆盖（br 后是元素而非纯文本，回退到 contents -1），

@@ -1,4 +1,4 @@
-# AGSVPT 末日 www.agsvpt.com — NexusPHP
+# AGSVPT 末日 pt.agsvpt.cn — NexusPHP
 # 适配: 2026-09 实测。列: 1类型 2标题 3评论 4时间 5大小 6种子 7下载 8完成 9发布者
 # 关键差异（与 kufei 同构但有一处必须显式配）：
 #   * 无 tbody，用 table.torrents tr:has(table.torrentname)
@@ -7,10 +7,10 @@
 #     必须显式写 tags 选择器；同理 extractNexusSubject 返回空，YAML subject 生效。
 #   * 免费/2X免费有 onmouseover 剩余时间；50% 无剩余时间（img.pro_50pctdown 无 onmouseover）
 #   * page=0 首页（16 条置顶 + 正常），page=1/2 顺序推进，页间无重叠，无 skip_page1 陷阱
-#   * domain 必须带 www：裸 agsvpt.com 会 302
+#   * 入口用 pt.agsvpt.cn（国内线路）。www.agsvpt.com 走 Cloudflare，首页读取容易超时；裸 agsvpt.com 会 302
 id: agsv
 name: 末日
-domain: https://www.agsvpt.com/
+domain: https://pt.agsvpt.cn/
 encoding: UTF-8
 
 login:
@@ -37,7 +37,7 @@ category_mappings:
   - { id: 419, cate_level1: TV, cate_level2: TV, cate_level2_desc: "短剧" }
 
 userinfo:
-  path: https://www.agsvpt.com/index.php
+  path: https://pt.agsvpt.cn/index.php
   item:
     selector: table[id="info_block"]
   fields:
