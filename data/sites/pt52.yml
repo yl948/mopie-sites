@@ -1,0 +1,176 @@
+# 52PT（52pt.site）— ✅ 已在 Mopie 适配（id=27，2026-10-19 实测）
+# - 经典 NexusPHP 10 列（CHD 皮肤变体）：1类型 2标题格 3评论 4时间 5大小 6种子 7下载 8完成 9未完成 10发布者
+#   → size/seeders/leechers = 5/6/7；外层 td 全 rowfollow，标题格内嵌 table.torrentname(td.embedded)
+# - 行 class 恒为 thirtypercentdown_bg（118/118 行都有）→ 是配色不是折扣，折扣只看 img.pro_*
+# - 促销：img.pro_free 带真实截止 DOM（标题格内 <font>剩余时间：<b><span title>）；pro_free2up 无截止
+#   → 无截止的行会被解析器兜底成发布时间（pitfalls #19b，纯显示问题）
+# - userinfo 是 CHD 系 font.color_*，但上传量与下载量标签间无 \s{2,} 边界 → 三个数值字段统一
+#   span.medium + re_search 捕获组（同雷区/堡站写法）
+# - 搜索：cat401=1 前缀参数 + search_area 0=标题/1=简介/3=发布者/4=IMDb
+#   「标题」库对最新种子有索引延迟（刚发的种子搜不到），「简介」更全，属站点行为
+id: pt52
+name: 52PT
+domain: https://52pt.site/
+encoding: UTF-8
+
+# 前端认证方式下拉：Cookie 或 用户名密码（NexusPHP /takelogin.php）
+allow_auth_type:
+  - cookies
+  - username_password
+
+# 登录态判定：info_block + 退出链接（同经典 NexusPHP）
+login:
+  test:
+    selector: a[href*="logout.php"], table#info_block
+
+# 分类 ID 实测（2026-10-19，导航下拉 + 种子行 ?cat=NNN + 搜索表单 catNNN）
+# 401 电影 / 402 剧集 / 403 综艺 / 404 纪录片 / 405 动漫 / 406 音乐MV /
+# 407 体育 / 408 无损音乐 / 409 其他 / 410 戏曲 / 411 18+
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动漫" }
+  - { id: 406, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐MV/演唱会" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "无损音乐" }
+  - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其他" }
+  - { id: 410, cate_level1: Other, cate_level2: Other, cate_level2_desc: "戏曲曲艺" }
+  - { id: 411, cate_level1: Other, cate_level2: Other, cate_level2_desc: "18+" }
+
+# CHD 系皮肤：字段全挤在 td.bottom 里，靠 font.color_* 定位值
+# 上传量与下载量标签之间没有空白边界（"1.607 TB<font> 下载量："），
+# next_sibling 的 \s{2,} 切分会把「下载量：15.01 GB」一起吞进来 → 统一用容器 span.medium + re_search 捕获组
+userinfo:
+  path: https://52pt.site/index.php
+  item:
+    selector: 'table#info_block'
+  fields:
+    uid:
+      default_value: 0
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: 'a[href*="userdetails.php?id="] b'
+    share_ratio:
+      default_value: ''
+      selector: 'span.medium'
+      filters:
+        - name: re_search
+          args: [ '分享率[：:]\s*([\d.]+)', 1 ]
+    uploaded:
+      default_value: 0
+      selector: 'span.medium'
+      filters:
+        - name: re_search
+          args: [ '上传量[：:]\s*([\d.]+\s*[KMGTP]i?B)', 1 ]
+    downloaded:
+      default_value: 0
+      selector: 'span.medium'
+      filters:
+        - name: re_search
+          args: [ '下载量[：:]\s*([\d.]+\s*[KMGTP]i?B)', 1 ]
+
+# 搜索：关键字参数 search + search_area（0=标题 1=简介 3=发布者 4=IMDb），
+# 分类是同名前缀参数 cat401=1（不是 cat[]=），与猫站/下水道一致。
+# 实测：本站「标题」库对最新种子有索引延迟（刚发的种子搜不到），「简介」反而更全；
+# 但保持 cat 前缀 + search_area=4 走 IMDb，与订阅流程一致。
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{{query.keyword}}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{% endif %}"
+    search_mode: 0
+    incldead: 1
+    spstate: 0
+    inclbookmarked: 0
+    sort: "{{query.sort}}"
+    type: "{{query.type}}"
+    page: "{{query.page}}"
+
+# 列表结构实测（2026-10-19，经典 NexusPHP 10 列）：
+#   1类型 2标题格 3评论 4时间 5大小 6种子 7下载 8完成 9未完成 10发布者
+#   外层 td 全 rowfollow，标题格内嵌 table.torrentname（td.embedded）
+#   —— 另一颗 td.embedded 是右侧下载/收藏/购物车图标格，用 :has 区分
+#   行 class 恒为 thirtypercentdown_bg（118/118 行都有，是配色不是折扣，勿当促销）
+#   page=0 与 page=1 内容不重叠（skip_page1: false），100 条/页
+torrents:
+  list:
+    selector: 'table.torrents tr:has(table.torrentname)'
+  fields:
+    id:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title:
+      selector: 'a[href^="details.php?id="][title]'
+    # 副标题 = 标题格 <br/> 后的裸文本（标签 span 之后的中文译名），
+    # 由解析器 extractNexusSubject 的 br 分支取，不写 subject 字段
+    category:
+      selector: 'td.rowfollow a[href^="?cat="]'
+      attribute: href
+      filters:
+        - name: replace
+          args: [ '?', '' ]
+        - name: querystring
+          args: [ 'cat' ]
+    details:
+      selector: 'a[href^="details.php?id="][title]'
+      attribute: href
+    download:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+    size:
+      selector: 'td.rowfollow:nth-child(5)'
+    date_added:
+      selector: 'td.rowfollow:nth-child(4) > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]
+    seeders:
+      selector: 'a[href*="#seeders"]'
+    leechers:
+      selector: 'a[href*="#leechers"]'
+    snatched:
+      selector: 'a[href^="viewsnatches.php?id="]'
+    downloadvolumefactor:
+      selector: td
+      case:
+        "img.pro_free": 0
+        "img.pro_free2up": 0
+        "img.pro_50pctdown2up": 0.5
+        "img.pro_50pctdown": 0.5
+        "img.pro_30pctdown": 0.3
+        "img.pro_70pctdown": 0.7
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        "img.pro_free2up": 2
+        "img.pro_2up": 2
+        "img.pro_50pctdown2up": 2
+        "*": 1
+    tags:
+      selector: 'table.torrentname td.embedded span[style*="background"]'
+    # 截止时间 = 标题格里的 <b><span title="截止">（发布时间的 span 在时间格，不会被误中）
+    free_deadline:
+      selector: 'table.torrentname td.embedded b > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]
