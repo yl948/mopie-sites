@@ -1,0 +1,168 @@
+id: chdbits
+name: 彩虹
+domain: https://ptchdbits.co/
+encoding: UTF-8
+ua: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
+
+# CHD 本家经典 NexusPHP（同 pterclub/春天 皮肤系），行内嵌套 table.torrentname
+login:
+  test:
+    selector: a[href*="logout"], table#info_block
+
+# 分类 ID 来自 2026-10-24 实测（搜索箱 cat401-410 checkbox + 行内 ?cat=NNN）
+category_mappings:
+  - { id: 401, cate_level1: Movie, cate_level2: Movies, cate_level2_desc: "电影" }
+  - { id: 402, cate_level1: TV, cate_level2: TV, cate_level2_desc: "剧集" }
+  - { id: 403, cate_level1: TV, cate_level2: TV, cate_level2_desc: "综艺" }
+  - { id: 404, cate_level1: Documentary, cate_level2: TV/Documentary, cate_level2_desc: "纪录片" }
+  - { id: 405, cate_level1: Anime, cate_level2: TV/Anime, cate_level2_desc: "动画" }
+  - { id: 406, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "音乐/MV" }
+  - { id: 407, cate_level1: TV, cate_level2: TV/Sport, cate_level2_desc: "体育" }
+  - { id: 408, cate_level1: Music, cate_level2: Audio, cate_level2_desc: "无损音乐" }
+  - { id: 409, cate_level1: Other, cate_level2: Other, cate_level2_desc: "其它" }
+  - { id: 410, cate_level1: Other, cate_level2: Other, cate_level2_desc: "游戏" }
+
+# 经典 info_block，字段间有换行/多空格，next_sibling 可正常切出（同 pterclub）
+userinfo:
+  path: https://ptchdbits.co/index.php
+  item:
+    selector: 'table#info_block'
+  fields:
+    uid:
+      default_value: 0
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    user_group:
+      default_value: ''
+      selector: 'a[href*="userdetails.php?id="]'
+      attribute: class
+    username:
+      default_value: '未知用户名'
+      selector: 'a[href*="userdetails.php?id="] b'
+    share_ratio:
+      default_value: ''
+      selector: 'font.color_ratio'
+      method: next_sibling
+    uploaded:
+      default_value: 0
+      selector: 'font.color_uploaded'
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限', 'inf' ]
+    downloaded:
+      default_value: 0
+      selector: 'font.color_downloaded'
+      method: next_sibling
+      filters:
+        - name: replace
+          args: [ '无限', 'inf' ]
+    seeding:
+      default_value: 0
+      selector: 'img[alt="Torrents seeding"]'
+      method: next_sibling
+    leeching:
+      default_value: 0
+      selector: 'img[alt="Torrents leeching"]'
+      method: next_sibling
+
+# 搜索分类参数是 cat401=1 前缀形态（行内 medium 链接印证）；incldead 标准语义 1=活种
+search:
+  paths:
+    - path: torrents.php
+      method: get
+  query:
+    $raw: "{% for c in query.cates %}cat{{c}}=1&{% endfor %}"
+    search: "{{query.keyword}}"
+    search_area: "{% if query.imdb_id %}4{% else %}0{% endif %}"
+    search_mode: 0
+    incldead: 1
+    spstate: 0
+    inclbookmarked: 0
+    sort: "{{query.sort}}"
+    type: "{{query.type}}"
+    page: "{{query.page}}"
+
+# 列结构实测 2026-10-24：外层 10 列，td 全 rowfollow
+#   1类型 2标题格(嵌套 table.torrentname) 3评论 4时间(span[title] 绝对时间) 5大小
+#   6种子(#seeders) 7下载(#leechers) 8完成(viewsnatches) 9发布者 10'--'
+# 注意：不能用 table.torrents > tbody > tr（0 行）；也不能脱离 table.torrents 限定，
+#   否则会匹配包住搜索箱的外层 tr。page=0/page=1 零重叠 → skip_page1: false。
+# 坑：内层标题表 tr 恒有 halfdown_bg/thirtypercentdown_bg 类（全站装饰底色，不是折扣，同 52PT）；
+#   置顶图标是 sticky1/sticky2（65/35，装饰性，非真置顶）。
+torrents:
+  list:
+    selector: 'table.torrents tr:has(table.torrentname)'
+  fields:
+    id:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+      filters:
+        - name: re_search
+          args: [ '\d+', 0 ]
+    title:
+      selector: 'a[href^="details.php?id="][title]'
+      attribute: title
+    subject:
+      selector: 'font.subtitle'
+      contents: 2
+    category:
+      selector: 'td.rowfollow a[href^="?cat="]'
+      attribute: href
+      filters:
+        - name: replace
+          args: [ '?', '' ]
+        - name: querystring
+          args: [ 'cat' ]
+    details:
+      selector: 'a[href^="details.php?id="][title]'
+      attribute: href
+    download:
+      selector: 'a[href^="download.php?id="]'
+      attribute: href
+    size:
+      selector: 'td.rowfollow:nth-child(5)'
+    date_added:
+      selector: 'td.rowfollow:nth-child(4) > span[title]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]
+    seeders:
+      selector: 'a[href*="#seeders"]'
+    leechers:
+      selector: 'a[href*="#leechers"]'
+    snatched:
+      selector: 'a[href^="viewsnatches.php?id="]'
+    downloadvolumefactor:
+      selector: td
+      case:
+        "img.pro_free": 0
+        "img.pro_free2up": 0
+        "img.pro_50pctdown2up": 0.5
+        "img.pro_50pctdown": 0.5
+        "img.pro_30pctdown": 0.3
+        "img.pro_70pctdown": 0.7
+        "*": 1
+    uploadvolumefactor:
+      selector: td
+      case:
+        "img.pro_free2up": 2
+        "img.pro_2up": 2
+        "img.pro_50pctdown2up": 2
+        "*": 1
+    tags:
+      selector: 'div.tag'
+    free_deadline:
+      selector: 'table.torrentname span[title^="20"]'
+      attribute: title
+      filters:
+        - name: dateparse
+          args: [ '%Y-%m-%d %H:%M:%S' ]
+    imdbid:
+      optional: true
+      selector: 'span[data-imdbid]'
+      attribute: data-imdbid
